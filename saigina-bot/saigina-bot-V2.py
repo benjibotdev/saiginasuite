@@ -1,5 +1,5 @@
-# a simple bot for Saiga's Empire
-# look I know this code is terrible don't judge me I'm lazy
+# Version 2 of Saigina-bot (designed for the Saiga's Empire discord server)
+
 import io
 import discord
 import re
