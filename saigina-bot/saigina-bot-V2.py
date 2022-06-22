@@ -20,7 +20,7 @@ global general_chat_channel, \
     lootbox_channel
 
 
-def dictFromFile(filename):
+def dictFromFilename(filename):
     with open(filename, 'r') as file:
         temp = {}
         for line in file.read().split('\n'):
@@ -31,8 +31,13 @@ def dictFromFile(filename):
     return temp
 
 
+def listFromFilename(filename):
+    with open(filename) as file:
+        return file.read().split('\n')
+
+
 # initialize API setup
-api_key_dict = dictFromFile("config/apikeys")
+api_key_dict = dictFromFilename("config/apikeys")
 # discord token
 discord_token = api_key_dict["discord_token"]
 # pixiv api
@@ -41,16 +46,15 @@ pixiv_api = AppPixivAPI()
 
 
 # set discord settings
-discord_settings_dict = dictFromFile("config/discordConfig")
+discord_settings_dict = dictFromFilename("config/discordConfig")
 gallery_category_id = int(discord_settings_dict["gallery_category_id"])
 saigina_smug_emote = discord_settings_dict["saigina_smug_emote"]
 saigina_feet_emote = discord_settings_dict["saigina_feet_emote"]
-with open("config/auth_user_ids") as f:
-    auth_users = f.read().split('\n')
+auth_users = listFromFilename("config/auth_user_ids")
 
 
 # set general settings
-general_settings_dict = dictFromFile("config/generalSettings")
+general_settings_dict = dictFromFilename("config/generalSettings")
 hall_of_fame_vote_thresh = general_settings_dict["hall_of_fame_vote_thresh"]
 sticker_emote_vote_pass_thresh = general_settings_dict["sticker_emote_vote_pass_thresh"]
 
@@ -84,7 +88,7 @@ async def loadConfig():
 
     # twitter api setup
     twitter_bearer_token = api_key_dict["twitter_bearer_token"]
-    twitter_stream_account_ids = dictFromFile("config/twitter_stream_account_ids")
+    twitter_stream_account_ids = dictFromFilename("config/twitter_stream_account_ids")
     twitterStreamRule = ""
     for item in twitter_stream_account_ids.keys():
         twitterStreamRule += "from:" + item + " "
@@ -99,23 +103,20 @@ async def loadConfig():
 
 
 def loadResources():
-    global nickname_registry_dictionary
-    nickname_registry_dictionary = dictFromFile("resources/name_registry")
-    global pinned_message_id_list
-    with open("resources/pinned_message_ids") as file:
-        pinned_message_id_list = file.read().split('\n')
-    global pixiv_feet_pic_list
-    with open("resources/pixiv_feet_pic_link_list") as file:
-        pixiv_feet_pic_list = file.read().split('\n')
+    global nickname_registry_dictionary, pinned_message_id_list, pixiv_feet_pic_list
+    nickname_registry_dictionary = dictFromFilename("resources/name_registry")
+    pinned_message_id_list = listFromFilename("resources/pinned_message_ids")
+    pixiv_feet_pic_list = listFromFilename("resources/pixiv_feet_pic_link_list")
 
 
 @discordClient.event
 async def on_ready():
-    print("Logged in as " + discordClient.user.name + "!")
-    print(discordClient.user.id)
-    print('------')
+    print("Discord connection successful, SAIGINABOT launched.")
     loadResources()
+    print("Resources loaded.")
     await loadConfig()
+    print("Configuration loaded.")
+    print("READY----")
 
 
 @discordClient.event
