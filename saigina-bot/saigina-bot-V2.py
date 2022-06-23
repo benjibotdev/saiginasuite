@@ -98,6 +98,9 @@ async def twitterApiConfigLoad():
     for item in twitter_stream_account_ids.keys():
         twitterStreamRule += "from:" + item + " "
     twitterStreamRule += "-is:retweet -is:reply -is:quote"
+    print(twitter_stream_account_ids)
+    print(twitterStreamRule)
+    return
     streamClient = SaigaStream(twitter_bearer_token)
     await streamClient.add_rules(tweepy.StreamRule(twitterStreamRule))
     try:
