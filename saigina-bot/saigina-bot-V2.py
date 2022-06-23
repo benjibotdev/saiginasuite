@@ -110,7 +110,6 @@ async def twitterApiConfigLoad():
         twitterStreamRule += "from:" + item + " "
     twitterStreamRule += "-is:retweet -is:reply -is:quote"
     await twitterStreamClient.add_rules(tweepy.StreamRule(twitterStreamRule))
-    print(await twitterStreamClient.get_rules())
     try:
         await twitterStreamClient.filter()
     except Exception as e:
