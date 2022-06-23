@@ -94,6 +94,8 @@ async def twitterApiConfigLoad():
     # twitter api setup
     twitter_bearer_token = api_key_dict["twitter_bearer_token"]
     twitter_stream_account_ids = dictFromFilename("config/twitter_stream_account_ids")
+    print(twitter_stream_account_ids)
+    return
     twitterStreamRule = ""
     for item in twitter_stream_account_ids.keys():
         twitterStreamRule += "from:" + item + " "
