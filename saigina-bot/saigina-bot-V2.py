@@ -95,16 +95,24 @@ async def twitterApiConfigLoad():
     twitter_bearer_token = api_key_dict["twitter_bearer_token"]
     twitter_stream_account_ids = dictFromFilename("config/twitter_stream_account_ids")
     twitterStreamRule = ""
+    twitterStreamClient = SaigaStream(twitter_bearer_token)
+
+    # remove all current active rules from twitter stream
+    rules = await twitterStreamClient.get_rules()
+    if rules.data is not None:
+        ids = []
+        for rule in rules.data:
+            ids.append(rule.id)
+        await twitterStreamClient.delete_rules(ids)
+
+    # generate new rule for filter
     for item in twitter_stream_account_ids.keys():
         twitterStreamRule += "from:" + item + " "
     twitterStreamRule += "-is:retweet -is:reply -is:quote"
-    print(twitter_stream_account_ids)
-    print(twitterStreamRule)
-    return
-    streamClient = SaigaStream(twitter_bearer_token)
-    await streamClient.add_rules(tweepy.StreamRule(twitterStreamRule))
+    await twitterStreamClient.add_rules(tweepy.StreamRule(twitterStreamRule))
+    print(await twitterStreamClient.get_rules())
     try:
-        await streamClient.filter()
+        await twitterStreamClient.filter()
     except Exception as e:
         print(e)
         exit(0)
