@@ -1,138 +1,77 @@
-# Version 2 of Saigina-bot (designed for the Saiga's Empire discord server)
-
+# a simple bot for Saiga's Empire
+# look I know this code is terrible don't judge me I'm lazy
 import io
 import discord
 import re
+import ast
 import time
 import random
 import requests
 from pixivpy3 import *
 import tweepy
-from tweepy import asynchronous as async_tweepy
-from threading import Thread
+from tweepy import asynchronous
+
+# saigina settings
+hofthresh = 5
+sbsthresh = 6
+
+with open("resources/name_registry", "r") as f:
+    names_dict = ast.literal_eval(f.read())
+with open("resources/pixiv_feet_pic_link_list", "r") as f:
+    img_lnk_lst = f.read().split('\n')
+with open("resources/pinned_message_ids", "r") as f:
+    dmid_list = f.read().split('\n')
+
+auth_users = ["Benjibot#7111", "Grone#8036", "Saiga#0417"]
+dtok = "ODYyMDgxMjA4NDQyODE0NDc0.YOTJsA.J4G32yRCuoTzEMDeMkDa4NcLtC4"
+hof_id = 880896332481585173
+saiga_sanct_id = 809995546009796668
+saigina_playground_id = 867150686583652416
+
+tauth = tweepy.OAuthHandler("TPu14J4NowHd0ALlrrvHOVyss", "IeQDwV9V2D5roFGomozWVXyPEDoGnXY8xB8vWBVd0Ox8NBrIji")
+tauth.set_access_token("TPu14J4NowHd0ALlrrvHOVyss", "vTJJL0cO4u6ighCBfi87oP05mcgoxbI9fz6xFxnplWQpE")
+tapi = tweepy.API(tauth)
+saiga_twt_acct_ids = {"1108266112649740288": "LewdSaiga"}#, "1437352141539192832": "SoftSaiga"}
 
 
-discordClient = discord.Client()
-global general_chat_channel, \
-    hall_of_fame_channel, \
-    saigas_sanctuary_channel, \
-    server_boosters_channel, \
-    saiginas_playground_channel, \
-    lootbox_channel
+# discord settings
+client = discord.Client()
+hof = client.get_channel(hof_id)
+sanct = client.get_channel(saiga_sanct_id)
+plgrnd = client.get_channel(saigina_playground_id)
+saigina_smug_id = "<:saigina_smug:926352839146614824>"
+
+# pixivpy settings
+ptok = "EWw3dal-w0BRZIYETcpw0uUWOBBjARdsbwEziZzeZ3Q"
+api = AppPixivAPI()
+api.auth(refresh_token=ptok)
 
 
-# produces a dictionary from a filename, follow configuration guide in README
-def dictFromFilename(filename):
-    with open(filename, 'r') as file:
-        temp = {}
-        for line in file.read().split('\n'):
-            if line == "":
-                continue
-            line_split = line.split(':=')
-            temp[line_split[0]] = line_split[1]
-    return temp
-
-
-# produces a list from a filename, follow configuration guide in README
-def listFromFilename(filename):
-    with open(filename) as file:
-        return file.read().split('\n')
-
-
-# initialize API setup
-api_key_dict = dictFromFilename("config/apikeys")
-# discord token
-discord_token = api_key_dict["discord_token"]
-# pixiv api
-pixiv_token = api_key_dict["pixiv_token"]
-pixiv_api = AppPixivAPI()
-
-
-# set discord settings
-discord_settings_dict = dictFromFilename("config/discordConfig")
-gallery_category_id = int(discord_settings_dict["gallery_category_id"])
-saigina_smug_emote = discord_settings_dict["saigina_smug_emote"]
-saigina_feet_emote = discord_settings_dict["saigina_feet_emote"]
-auth_users = listFromFilename("config/auth_user_ids")
-
-
-# set general settings
-general_settings_dict = dictFromFilename("config/generalSettings")
-hall_of_fame_vote_thresh = general_settings_dict["hall_of_fame_vote_thresh"]
-sticker_emote_vote_pass_thresh = general_settings_dict["sticker_emote_vote_pass_thresh"]
-
-
-global nickname_registry_dictionary
-global pinned_message_id_list
-global pixiv_feet_pic_list
-
-
-class SaigaStream(async_tweepy.AsyncStreamingClient):
-    async def on_tweet(self, tweet):
-        link = "https://twitter.com/twitter/statuses/" + str(tweet.id)
-        await saigas_sanctuary_channel.send(link)
-
-
-def loadConfig():
-    # discord config
-    global general_chat_channel, \
-        hall_of_fame_channel, \
-        saigas_sanctuary_channel, \
-        server_boosters_channel, \
-        saiginas_playground_channel, \
-        lootbox_channel
-
-    general_chat_channel = discordClient.get_channel(int(discord_settings_dict["general_chat_channel_id"]))
-    hall_of_fame_channel = discordClient.get_channel(int(discord_settings_dict["hall_of_fame_channel_id"]))
-    saigas_sanctuary_channel = discordClient.get_channel(int(discord_settings_dict["saigas_sanctuary_channel_id"]))
-    server_boosters_channel = discordClient.get_channel(int(discord_settings_dict["server_boosters_channel_id"]))
-    saiginas_playground_channel = discordClient.get_channel(int(discord_settings_dict["saiginas_playground_channel_id"]))
-    lootbox_channel = discordClient.get_channel(int(discord_settings_dict["lootbox_channel_id"]))
-
-
-async def twitterApiConfigLoad():
-    # twitter api setup
-    twitter_bearer_token = api_key_dict["twitter_bearer_token"]
-    twitter_stream_account_ids = dictFromFilename("config/twitter_stream_account_ids")
-    twitterStreamRule = ""
-    for item in twitter_stream_account_ids.keys():
-        twitterStreamRule += "from:" + item + " "
-    twitterStreamRule += "-is:retweet -is:reply -is:quote"
-    streamClient = SaigaStream(twitter_bearer_token)
-    await streamClient.add_rules(tweepy.StreamRule(twitterStreamRule))
-    try:
-        await streamClient.filter()
-    except Exception as e:
-        print(e)
-        exit(0)
-
-
-def loadResources():
-    global nickname_registry_dictionary, pinned_message_id_list, pixiv_feet_pic_list
-    nickname_registry_dictionary = dictFromFilename("resources/name_registry")
-    pinned_message_id_list = listFromFilename("resources/pinned_message_ids")
-    pixiv_feet_pic_list = listFromFilename("resources/pixiv_feet_pic_link_list")
-
-
-@discordClient.event
+@client.event
 async def on_ready():
-    print("Discord connection successful, SAIGINABOT launched.")
-    loadResources()
-    print("Resources loaded.")
-    loadConfig()
-    print("Configuration loaded.")
-    await twitterApiConfigLoad()
+    global hof, sanct, plgrnd
+    print("Logged in as " + client.user.name + "!")
+    print(client.user.id)
+    print('------')
+    hof = client.get_channel(hof_id)
+    sanct = client.get_channel(saiga_sanct_id)
+    plgrnd = client.get_channel(saigina_playground_id)
 
 
-@discordClient.event
+@client.event
 async def on_message(message):
-    global pixiv_feet_pic_list
+    global img_lnk_lst
+    IS_DEBUG_CHAN = "saiginas-playground" in str(message.channel)
+    uauthd = str(message.author) in auth_users
 
-    # ignore this message if it comes from self
-    if message.author == discordClient.user:
+    '''
+    if "test" in message.content:
+        print(message.channel.id)
         return
-
-    user_id_string = str(message.author.id)
+    '''
+    # ignore this message if it comes from self
+    if message.author == client.user:
+        return
 
     # are you there saigina
     if message.content == "Are you there, Saigina?":
@@ -143,34 +82,34 @@ async def on_message(message):
 
     # good morning saigina protocol
     if re.compile("[Gg]ood +[Mm]orning,? +[Ss]aigina!?").search(message.content):
-        if user_id_string not in nickname_registry_dictionary:
-            await message.channel.send("Good morning! " + saigina_smug_emote)
+        if str(message.author).encode('utf-8') not in names_dict:
+            await message.channel.send("Good morning!" + saigina_smug_id)
         else:
-            await message.channel.send("Good morning, " + nickname_registry_dictionary[user_id_string] +
-                                       ". " + saigina_smug_emote)
+            await message.channel.send("Good morning, " + names_dict[str(message.author).encode('utf-8')] +
+                                       ". " + saigina_smug_id)
 
     # good night saigina protocol
     if re.compile("[Gg]ood +[Nn]ight,? +[Ss]aigina\.?").search(message.content):
-        if user_id_string not in nickname_registry_dictionary:
-            await message.channel.send("Good night " + saigina_smug_emote)
+        if str(message.author).encode('utf-8') not in names_dict:
+            await message.channel.send("Good night " + saigina_smug_id)
         else:
-            await message.channel.send("Good night, " + nickname_registry_dictionary[user_id_string] +
-                                        ". " + saigina_smug_emote)
+            await message.channel.send("Good night, " + names_dict[str(message.author).encode('utf-8')] +
+                                        ". " + saigina_smug_id)
         return
 
     # show feet protocol
     if re.compile("[Ss][Hh][Oo][Ww].+[Ff][Ee]{2}[Tt]").search(message.content) and \
             ("Saigina" in message.content or "saigina" in message.content):
-        await message.channel.send(saigina_feet_emote + saigina_smug_emote)
+        await message.channel.send("<:saigina_foot:867580399605514240>" + saigina_smug_id)
         return
 
     # search for feet pics protocol
     if re.compile("[Ss]aigina,? +look +for +feet").search(message.content) \
-            and message.channel.id == lootbox_channel.id:
+            and ("lootbox" in message.channel.name or IS_DEBUG_CHAN):
         try:
             async with message.channel.typing():
-                img_lnk_num = random.randint(0, len(pixiv_feet_pic_list))
-                img_req = requests.get(pixiv_feet_pic_list[img_lnk_num], headers={'Referer': 'https://app-api.pixiv.net/'}, stream=True)
+                img_lnk_num = random.randint(0, len(img_lnk_lst))
+                img_req = requests.get(img_lnk_lst[img_lnk_num], headers={'Referer': 'https://app-api.pixiv.net/'}, stream=True)
                 img_file = io.BytesIO(img_req.content)
                 img_file.name = "LBV2image" + str(img_lnk_num) + ".jpg"
                 await message.channel.send(file=discord.File(img_file))
@@ -180,10 +119,10 @@ async def on_message(message):
         return
 
     pk_re = re.compile("[Ss]aigina,? +look +for +key(?:word)? +(.+)").search(message.content)
-    if pk_re and message.channel.id == lootbox_channel.id:
-        pixiv_api.auth(refresh_token=pixiv_token)
+    if pk_re:
+        api.auth(refresh_token=ptok)
         async with message.channel.typing():
-            result = pixiv_api.search_illust(pk_re.groups()[0], search_target='title_and_caption')
+            result = api.search_illust(pk_re.groups()[0], search_target='title_and_caption')
             try:
                 if result is not None and "error" not in result:
                     if len(result["illusts"]) == 0:
@@ -208,10 +147,10 @@ async def on_message(message):
     # search_target='exact_match_for_tags'
     # search_target='title_and_caption'
     ps_re = re.compile("[Ss]aigina,? +look +for +(.+)").search(message.content)
-    if ps_re and message.channel.id == lootbox_channel.id:
-        pixiv_api.auth(refresh_token=pixiv_token)
+    if ps_re and ("lootbox" in str(message.channel) or IS_DEBUG_CHAN):
+        api.auth(refresh_token=ptok)
         async with message.channel.typing():
-            result = pixiv_api.search_illust(ps_re.groups()[0])
+            result = api.search_illust(ps_re.groups()[0])
             try:
                 if result is not None and "error" not in result:
                     if len(result["illusts"]) == 0:
@@ -252,7 +191,7 @@ async def on_message(message):
         return
 
     # joke protocol
-    if re.compile("[Ss]aigina,? +tell +me +a +joke").search(message.content) and message.channel.id == general_chat_channel.id:
+    if re.compile("[Ss]aigina,? +tell +me +a +joke").search(message.content) and ("general-chat" in message.channel.name or IS_DEBUG_CHAN):
         jokes_dict = {"What did the toaster say to the slice of bread?": "\"I want you inside me.\"",
         "What does the cannibal have in the shower?": "Head & Shoulders.",
         "Two men broke into a drugstore and stole all the Viagra.":
@@ -274,53 +213,58 @@ async def on_message(message):
     # name request protocol
     nr_re = re.compile("[Ss]aigina,? call me ([^.]*)\.?").match(message.content)
     if nr_re:
-        nickname_registry_dictionary[user_id_string] = nr_re.groups()[0]
-        with open("resources/name_registry", "w+") as file:
-            for key in nickname_registry_dictionary.keys():
-                file.write(key + ":=" + nickname_registry_dictionary[key] + '\n')
-        await message.reply("Sure thing, " + nr_re.groups()[0] + ". " + saigina_smug_emote)
+        names_dict[str(message.author).encode('utf-8')] = nr_re.groups()[0]
+        tfile = open("resources/name_registry", "w+")
+        tfile.write(str(names_dict))
+        tfile.close()
+        await message.reply("Sure thing, " + nr_re.groups()[0] + ". " + saigina_smug_id)
         return
 
     # name verification protocol
     if re.compile("[Ss]aigina,? what do you call me\??").match(message.content):
-        if user_id_string not in nickname_registry_dictionary:
+        if str(message.author).encode('utf-8') not in names_dict:
             await message.reply("I don't know what to call you yet!")
         else:
-            await message.reply("I call you " + nickname_registry_dictionary[user_id_string] +
-                                ". " + saigina_smug_emote)
+            await message.reply("I call you " + names_dict[str(message.author).encode('utf-8')] +
+                                ". " + saigina_smug_id)
         return
 
     if re.compile("[Ss]aigina,? help!?").match(message.content):
-        await message.channel.send("Hi, I'm Saigina! " + saigina_smug_emote + "\n"
+        await message.channel.send("Hi, I'm Saigina! " + saigina_smug_id + "\n"
                                    "I have a few commands: \n"
                                    "Good morning/night Saigina\n"
                                    "Saigina show feet\n"
                                    "What's up, Saigina?\n"
                                    "Saigina, tell me a joke\n"
                                    "Saigina, call me _. and Saigina, what do you call me?\n")
-        return
-
-    if message.channel.id == server_boosters_channel.id and (("emote" in message.content or "Emote" in message.content
+    if ("server-boosters" in message.channel.name or IS_DEBUG_CHAN) and (("emote" in message.content or "Emote" in message.content
                           or "sticker" in message.content or "Sticker" in message.content) and message.attachments):
         await message.add_reaction('✅')
         await message.add_reaction('❌')
-        return
 
 
-@discordClient.event
+@client.event
 async def on_raw_reaction_add(payload):
-    user = await discordClient.fetch_user(int(payload.user_id))
-    if user == discordClient.user:
-        return
     reaction = payload.emoji
-    channel = discordClient.get_channel(payload.channel_id)
+    channel = client.get_channel(payload.channel_id)
     message = await channel.fetch_message(payload.message_id)
-    uauthd = str(user.id) in auth_users
+    user = await client.fetch_user(int(payload.user_id))
+    cname = str(channel.category)
+    uauthd = str(user) in auth_users
+    IS_DEBUG_CHAN = "saiginas-playground" in channel.name
     # pins messages in the gallery and other fetish channels if they reach 5 reactions
-    if message.channel.category.id == gallery_category_id \
-            and ("❤" in reaction.name and [x for x in message.reactions if "❤" in str(x.emoji)][0].count == hall_of_fame_vote_thresh):
+    if ("Gallery" in cname or "Other Fetish" in cname or IS_DEBUG_CHAN) \
+            and ("❤" in reaction.name and [x for x in message.reactions if "❤" in str(x.emoji)][0].count == hofthresh):
         await move_pin(message)
-    if channel.id == lootbox_channel.id and message.author == discordClient.user \
+    if "boosters" in str(channel) or IS_DEBUG_CHAN:
+        check = reaction_from_str('✅', message.reactions)
+        ecks = reaction_from_str('❌', message.reactions)
+        if check is None or ecks is None:
+            return
+        if check.count - (ecks.count - 1) == sbsthresh and is_unique_message(str(message.id)):
+            await message.reply("This submission has passed the vote! "
+                            "Attention <@668745400492097549> and <@254822619860172800>")
+    if "lootbox" in str(channel) and message.author == client.user \
             and str(payload.emoji.name) == "❌" and uauthd:
         await message.delete()
         try:
@@ -333,40 +277,35 @@ async def on_raw_reaction_add(payload):
                 await message.channel.send("That image is from an older lootbox.")
                 return
             with open("resources/pixiv_feet_pick_purged_link_list", "a") as tf:
-                tf.write(pixiv_feet_pic_list[int(rmname.groups()[0])] + "\n")
-            del pixiv_feet_pic_list[int(rmname.groups()[0])]
+                tf.write(img_lnk_lst[int(rmname.groups()[0])] + "\n")
+            del img_lnk_lst[int(rmname.groups()[0])]
             fp_rewrite()
         except Exception as e:
             print(e)
             await message.channel.send("Sorry! Something went wrong.")
             return
         await message.channel.send("Sorry! You won't be seeing that picture again. :x:")
-    if channel.id == server_boosters_channel.id and ('❌' in reaction.name or '✅' in reaction.name) and message.author != discordClient.user:
-        check = reaction_from_str('✅', message.reactions)
-        ecks = reaction_from_str('❌', message.reactions)
-        if check is None or ecks is None:
-            return
-        if check.count - (ecks.count - 1) == sticker_emote_vote_pass_thresh and is_unique_message(str(message.id)):
-            await message.reply("This submission has passed the vote! "
-                            "Attention <@668745400492097549> and <@254822619860172800>")
+    if str(payload.emoji.name) == "❌" and message.author == client.user and uauthd:
+        await message.delete()
+        return
 
 
 def fp_rewrite():
     tlfile = open("resources/pixiv_feet_pic_link_list", "w+")
-    for i in range(0, len(pixiv_feet_pic_list) - 1):
-        tlfile.write(pixiv_feet_pic_list[i])
+    for i in range(0, len(img_lnk_lst) - 1):
+        tlfile.write(img_lnk_lst[i])
         tlfile.write("\n")
-    tlfile.write(pixiv_feet_pic_list[len(pixiv_feet_pic_list) - 1])
+    tlfile.write(img_lnk_lst[len(img_lnk_lst) - 1])
     tlfile.close()
 
 
 def is_unique_message(message_id):
-    if message_id in pinned_message_id_list:
+    if message_id in dmid_list:
         return False
     else:
-        pinned_message_id_list.append(message_id)
+        dmid_list.append(message_id)
         with open("resources/pinned_message_ids", "a") as tf:
-            tf.write('\n' + message_id)
+            tf.write(message_id + "\n")
         return True
 
 
@@ -384,7 +323,8 @@ async def move_pin(message):
         while temp:
             content = content.replace(temp.groups()[0], "")
             temp = mp_re.search(content)
-        await hall_of_fame_channel.send(content=content, embed=embeds)
+        # await message.channel.send(content=content, embed=embeds)
+        await hof.send(content=content, embed=embeds)
 
 
 def reaction_from_str(rxn, lst):
@@ -394,8 +334,22 @@ def reaction_from_str(rxn, lst):
     return None
 
 
+class SaigaStream(tweepy.asynchronous.AsyncStream):
+    async def on_status(self, status):
+        if status.user.id_str not in saiga_twt_acct_ids.keys() or status.is_quote_status or "RT" == status.text[:2] or status.in_reply_to_status_id is not None:
+            return
+        link = "https://twitter.com/" + status.user.screen_name + '/status/' + status.id_str
+        await sanct.send(link)
+
+
+tstream = SaigaStream("TPu14J4NowHd0ALlrrvHOVyss", "IeQDwV9V2D5roFGomozWVXyPEDoGnXY8xB8vWBVd0Ox8NBrIji",
+                        "1368842761890324481-05j2eQEMj3yVGRBmDrVvwu2NKfcnib",
+                        "vTJJL0cO4u6ighCBfi87oP05mcgoxbI9fz6xFxnplWQpE")
+tstream.filter(follow=saiga_twt_acct_ids.keys())
+
+
 try:
-    discordClient.run(discord_token)
+    client.run(dtok)
 except KeyboardInterrupt:
     print("Goodnight, Saigina!")
-    discordClient.close()
+    client.close()
