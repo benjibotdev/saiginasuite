@@ -58,8 +58,8 @@ auth_users = listFromFilename("config/auth_user_ids")
 
 # set general settings
 general_settings_dict = dictFromFilename("config/generalSettings")
-hall_of_fame_vote_thresh = general_settings_dict["hall_of_fame_vote_thresh"]
-sticker_emote_vote_pass_thresh = general_settings_dict["sticker_emote_vote_pass_thresh"]
+hall_of_fame_vote_thresh = int(general_settings_dict["hall_of_fame_vote_thresh"])
+sticker_emote_vote_pass_thresh = int(general_settings_dict["sticker_emote_vote_pass_thresh"])
 
 
 global nickname_registry_dictionary
@@ -327,8 +327,13 @@ async def on_raw_reaction_add(payload):
     message = await channel.fetch_message(payload.message_id)
     uauthd = str(user.id) in auth_users
     # pins messages in the gallery and other fetish channels if they reach 5 reactions
-    if message.channel.category.id == gallery_category_id \
-            and ("❤" in reaction.name and [x for x in message.reactions if "❤" in str(x.emoji)][0].count == hall_of_fame_vote_thresh):
+    hall_of_fame_vote_thresh_PASSED = False
+    for rxn in message.reactions:
+        if rxn.count == hall_of_fame_vote_thresh:
+            hall_of_fame_vote_thresh_PASSED = True
+    print(hall_of_fame_vote_thresh_PASSED)
+    if message.channel.category is not None and message.channel.category.id == gallery_category_id \
+            and hall_of_fame_vote_thresh_PASSED:
         await move_pin(message)
     if channel.id == lootbox_channel.id and message.author == discordClient.user \
             and str(payload.emoji.name) == "❌" and uauthd:
