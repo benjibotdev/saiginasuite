@@ -1,5 +1,5 @@
 # Version 2 of Saigina-bot (designed for the Saiga's Empire discord server)
-
+import copy
 import io
 import discord
 import re
@@ -9,10 +9,9 @@ import requests
 from pixivpy3 import *
 import tweepy
 from tweepy import asynchronous as async_tweepy
-from threading import Thread
 
 
-discordClient = discord.Client()
+discordClient = discord.Client(intents=discord.Intents.all())
 global general_chat_channel, \
     hall_of_fame_channel, \
     saigas_sanctuary_channel, \
@@ -60,11 +59,14 @@ auth_users = listFromFilename("config/auth_user_ids")
 general_settings_dict = dictFromFilename("config/generalSettings")
 hall_of_fame_vote_thresh = int(general_settings_dict["hall_of_fame_vote_thresh"])
 sticker_emote_vote_pass_thresh = int(general_settings_dict["sticker_emote_vote_pass_thresh"])
+saigina_respond_chance_percent = int(general_settings_dict["saigina_respond_chance_percent"])
 
 
 global nickname_registry_dictionary
 global pinned_message_id_list
 global pixiv_feet_pic_list
+global joke_list
+global joke_purg
 
 
 class SaigaStream(async_tweepy.AsyncStreamingClient):
@@ -118,10 +120,14 @@ async def twitterApiConfigLoad():
 
 
 def loadResources():
-    global nickname_registry_dictionary, pinned_message_id_list, pixiv_feet_pic_list
+    global nickname_registry_dictionary, pinned_message_id_list, pixiv_feet_pic_list, joke_list, joke_purg
     nickname_registry_dictionary = dictFromFilename("resources/name_registry")
     pinned_message_id_list = listFromFilename("resources/pinned_message_ids")
     pixiv_feet_pic_list = listFromFilename("resources/pixiv_feet_pic_link_list")
+    joke_list = []
+    for line in listFromFilename("resources/joke_list"):
+        joke_list.append(line.split(":="))
+    joke_purg = []
 
 
 @discordClient.event
@@ -145,11 +151,18 @@ async def on_message(message):
     user_id_string = str(message.author.id)
 
     # are you there saigina
+    # technically deprecated, but I see no reason to remove this
     if message.content == "Are you there, Saigina?":
         await message.reply("Yup, I'm here!")
         return
 
-    # TODO hello saigina protocol
+    # hello saigina protocol
+    if re.compile("[Hh]ello,? +[Ss]aigina!?").search(message.content):
+        if user_id_string not in nickname_registry_dictionary:
+            await message.channel.send("Hello! " + saigina_smug_emote)
+        else:
+            await message.channel.send("Hello, " + nickname_registry_dictionary[user_id_string] +
+                                       ". " + saigina_smug_emote)
 
     # good morning saigina protocol
     if re.compile("[Gg]ood +[Mm]orning,? +[Ss]aigina!?").search(message.content):
@@ -174,21 +187,7 @@ async def on_message(message):
         await message.channel.send(saigina_feet_emote + saigina_smug_emote)
         return
 
-    # search for feet pics protocol
-    if re.compile("[Ss]aigina,? +look +for +feet").search(message.content) \
-            and message.channel.id == lootbox_channel.id:
-        try:
-            async with message.channel.typing():
-                img_lnk_num = random.randint(0, len(pixiv_feet_pic_list))
-                img_req = requests.get(pixiv_feet_pic_list[img_lnk_num], headers={'Referer': 'https://app-api.pixiv.net/'}, stream=True)
-                img_file = io.BytesIO(img_req.content)
-                img_file.name = "LBV2image" + str(img_lnk_num) + ".jpg"
-                await message.channel.send(file=discord.File(img_file))
-        except Exception as e:
-            print(e)
-            await message.channel.send("Sorry, something went wrong. Try again!")
-        return
-
+    # pixiv search by keyword
     pk_re = re.compile("[Ss]aigina,? +look +for +key(?:word)? +(.+)").search(message.content)
     if pk_re and message.channel.id == lootbox_channel.id:
         pixiv_api.auth(refresh_token=pixiv_token)
@@ -263,22 +262,19 @@ async def on_message(message):
 
     # joke protocol
     if re.compile("[Ss]aigina,? +tell +me +a +joke").search(message.content) and message.channel.id == general_chat_channel.id:
-        jokes_dict = {"What did the toaster say to the slice of bread?": "\"I want you inside me.\"",
-        "What does the cannibal have in the shower?": "Head & Shoulders.",
-        "Two men broke into a drugstore and stole all the Viagra.":
-        "The police put out an alert to be on the lookout for the two hardened criminals.",
-        "Why shouldn’t you write with a broken pen?": "Because it’s pointless.",
-        "What's my favorite fruit?": "Toe-mato!",
-        "If you prostitute yourself to someone with a foot fetish, you have sold your sole..": None,
-        "What goes in hard and dry, and then comes out wet and soft?": "Chewing gum.",
-        "What do sprinters eat before a race?": "Nothing, they fast.",
-        "Why did Princess Peach begin to choke?": "Because Mario came down the wrong pipe."}
-        chosen_joke = random.choice(list(jokes_dict.keys()))
-        await message.channel.send(chosen_joke)
-        if jokes_dict[chosen_joke] is None:
-            return
-        time.sleep(6)
-        await message.channel.send(jokes_dict[chosen_joke])
+        global joke_list, joke_purg
+        if len(joke_list) <= len(joke_purg) / 3:
+            for joke in joke_purg:
+                joke_list.append(joke)
+            joke_purg = []
+        chosen_num = random.randint(0, len(joke_list) - 1)
+        chosen_joke = joke_list[chosen_num]
+        joke_purg.append(joke_list[chosen_num])
+        del joke_list[chosen_num]
+        for part in chosen_joke:
+            async with message.channel.typing():
+                time.sleep(3)
+                await message.channel.send(part)
         return
 
     # name request protocol
@@ -316,6 +312,11 @@ async def on_message(message):
         await message.add_reaction('❌')
         return
 
+    if "saigina" in message.content or "Saigina" in message.content:
+        if random.randint(1, 100) < saigina_respond_chance_percent:
+            await message.channel.send("👁️👄👁️")
+        return
+
 
 @discordClient.event
 async def on_raw_reaction_add(payload):
@@ -331,7 +332,6 @@ async def on_raw_reaction_add(payload):
     for rxn in message.reactions:
         if rxn.count == hall_of_fame_vote_thresh:
             hall_of_fame_vote_thresh_PASSED = True
-    print(hall_of_fame_vote_thresh_PASSED)
     if message.channel.category is not None and message.channel.category.id == gallery_category_id \
             and hall_of_fame_vote_thresh_PASSED:
         await move_pin(message)
